@@ -1,0 +1,31 @@
+# Build outputs
+bin/
+obj/
+
+# Visual Studio files
+*.user
+*.suo
+*.sln.docstates
+.vs/
+
+# Rider files
+.idea/
+*.DotSettings.user
+
+# Visual Studio Code
+.vscode/
+
+# NuGet packages (if you store them locally)
+*.nupkg
+packages/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# If you keep secrets or sensitive files, add them here.
+# Example: appsettings.secrets.json
+appsettings.*.local.json
