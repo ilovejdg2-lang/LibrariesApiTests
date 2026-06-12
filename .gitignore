@@ -1,31 +1,40 @@
 # Build outputs
 bin/
 obj/
+out/
+publish/
 
-# Visual Studio files
+# Visual Studio / IDE
 *.user
 *.suo
 *.sln.docstates
 .vs/
-
-# Rider files
 .idea/
 *.DotSettings.user
-
-# Visual Studio Code
 .vscode/
 
-# NuGet packages (if you store them locally)
+# NuGet
 *.nupkg
 packages/
 
-# OS-specific
+# OS
 .DS_Store
 Thumbs.db
 
 # Logs
 *.log
 
-# If you keep secrets or sensitive files, add them here.
-# Example: appsettings.secrets.json
+# Secretos — NUNCA subir
+HackerRank1/.env
+.env
+.env.*
+!.env.example
+
+HackerRank1/appsettings.Development.json
+HackerRank1/appsettings.Production.json
 appsettings.*.local.json
+
+HackerRank1/Properties/PublishProfiles/
+*.publishSettings
+
+secrets.json
