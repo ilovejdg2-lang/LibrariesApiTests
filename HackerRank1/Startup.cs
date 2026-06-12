@@ -64,18 +64,21 @@ namespace LibraryService.WebAPI
             // 4. Configurar Autorizacion
             services.AddAuthorization();
 
-            // 5. Configurar CORS para el FE (Vite dev server)
-            services.AddCors(o => o.AddPolicy("Frontend", p => p
-                .WithOrigins("http://localhost:5173")
+            // 5. CORS — frontend LabCIBE (Vite)
+            var allowedOrigins = Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                ?? new[] { "http://localhost:5173" };
+
+            services.AddCors(options => options.AddPolicy("Frontend", policy => policy
+                .WithOrigins(allowedOrigins)
                 .AllowAnyHeader()
                 .AllowAnyMethod()));
 
-
-            // Add support for Dependency Injection for internal services (BooksService and LibrariesService)
-            services.AddTransient<ILibrariesService,  LibrariesService>();
-            services.AddTransient<IBooksService,  BooksService>();
+            // 6. Servicios de dominio (DI)
+            services.AddTransient<ILibrariesService, LibrariesService>();
+            services.AddTransient<IBooksService, BooksService>();
             services.AddTransient<IFraudService, FraudService>();
 
+            // 7. DbContext — PostgreSQL (Supabase)
             var connectionString = BuildConnectionString(Configuration);
 
             services.AddDbContextPool<LibraryContext>(options =>
@@ -88,7 +91,13 @@ namespace LibraryService.WebAPI
                 }),
                 poolSize: 20);
 
-            services.AddControllers();
+            // 8. API controllers + JSON camelCase para el frontend
+            services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.PropertyNamingPolicy =
+                        System.Text.Json.JsonNamingPolicy.CamelCase;
+                });
 
             // Add Swagger generation
             services.AddSwaggerGen(c =>
@@ -97,7 +106,7 @@ namespace LibraryService.WebAPI
                 {
                     Title = "LibraryService API",
                     Version = "v1",
-                    Description = "A simple example ASP.NET Core Web API for LibraryService"
+                    Description = "API LabCIBE-UNA — bibliotecas, libros y reportes de fraude"
                 });
             });
         }
