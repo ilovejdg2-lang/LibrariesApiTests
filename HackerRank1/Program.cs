@@ -38,7 +38,10 @@ namespace LibraryService.WebAPI
 
                 var key = line[..separator].Trim();
                 var value = line[(separator + 1)..].Trim();
-                Environment.SetEnvironmentVariable(key, value);
+
+                // No sobreescribir variables ya definidas (p. ej. en Monster ASP o GitHub Actions)
+                if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(key)))
+                    Environment.SetEnvironmentVariable(key, value);
             }
         }
 

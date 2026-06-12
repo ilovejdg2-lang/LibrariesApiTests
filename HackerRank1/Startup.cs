@@ -30,13 +30,12 @@ namespace LibraryService.WebAPI
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            // 1. jwtSettings binding
-            var jwtSettings = Configuration
-                                .GetSection("JwtSettings")
-                                .Get<JwtSettings>()
-                                ?? throw new InvalidOperationException("Invalid JWT Settings");
-
-            // 2. Registro de DI
+            var jwtSettings = new JwtSettings
+            {
+                Issuer = GetRequiredEnv("JWT_ISSUER"),
+                Audience = GetRequiredEnv("JWT_AUDIENCE"),
+                SecretKey = GetRequiredEnv("JWT_SECRET_KEY"),
+            };
 
             services.AddSingleton(jwtSettings);
             services.AddScoped<IAuthenticationService, AuthenticationService>();
@@ -65,8 +64,7 @@ namespace LibraryService.WebAPI
             services.AddAuthorization();
 
             // 5. CORS — frontend LabCIBE (Vite)
-            var allowedOrigins = Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-                ?? new[] { "http://localhost:5173" };
+            var allowedOrigins = GetCorsOrigins();
 
             services.AddCors(options => options.AddPolicy("Frontend", policy => policy
                 .WithOrigins(allowedOrigins)
@@ -114,55 +112,69 @@ namespace LibraryService.WebAPI
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-
-
-                // Enable middleware to serve generated Swagger as a JSON endpoint.
-                app.UseSwagger();
-
-                // Enable middleware to serve swagger-ui, specifying the Swagger JSON endpoint.
-                app.UseSwaggerUI(c =>
-                {
-                    c.SwaggerEndpoint("/swagger/v1/swagger.json", "LibraryService API v1");
-                });
-            }
-
-
-
             using (var scope = app.ApplicationServices.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<LibraryContext>();
-                db.Database.Migrate();
+                try
+                {
+                    db.Database.Migrate();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Database init failed: {ex.Message}");
+                }
+            }
+
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
             }
 
             app.UseRouting();
 
-            app.UseCors("Frontend");
+            app.UseSwagger();
+            app.UseSwaggerUI(c =>
+            {
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "LibraryService API v1");
+                c.RoutePrefix = "swagger";
+            });
 
-            // Agregar los metodos de Auth al Middleware Pipeline.
+            app.UseCors("Frontend");
             app.UseAuthentication();
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
             {
+                endpoints.MapGet("/", context =>
+                {
+                    context.Response.Redirect("/swagger");
+                    return Task.CompletedTask;
+                });
+
                 endpoints.MapControllers();
             });
         }
 
         private static string BuildConnectionString(IConfiguration configuration)
         {
-            var baseConnectionString = configuration.GetConnectionString("DefaultConnection")
-                ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+            var baseConnectionString = Environment.GetEnvironmentVariable("CONNECTION_STRING")
+                ?? configuration.GetConnectionString("DefaultConnection")
+                ?? Environment.GetEnvironmentVariable("DATABASE_URL")
+                ?? Environment.GetEnvironmentVariable("SUPABASE_DB_URL");
 
-            var password = configuration["DB_PASSWORD"]
-                ?? Environment.GetEnvironmentVariable("DB_PASSWORD");
+            if (string.IsNullOrWhiteSpace(baseConnectionString))
+            {
+                throw new InvalidOperationException(
+                    "Database host not configured. Set CONNECTION_STRING in .env or Monster ASP environment variables.");
+            }
+
+            var password = Environment.GetEnvironmentVariable("DB_PASSWORD")
+                ?? configuration["DB_PASSWORD"];
 
             if (string.IsNullOrWhiteSpace(password))
             {
                 throw new InvalidOperationException(
-                    "Database password not configured. Set the DB_PASSWORD environment variable or add it to a local .env file.");
+                    "Database password not configured. Set DB_PASSWORD in .env or Monster ASP environment variables.");
             }
 
             var builder = new NpgsqlConnectionStringBuilder(baseConnectionString)
@@ -171,6 +183,27 @@ namespace LibraryService.WebAPI
             };
 
             return builder.ConnectionString;
+        }
+
+        private static string[] GetCorsOrigins()
+        {
+            var raw = Environment.GetEnvironmentVariable("CORS_ORIGINS");
+            if (string.IsNullOrWhiteSpace(raw))
+                return ["http://localhost:5173"];
+
+            return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        }
+
+        private static string GetRequiredEnv(string key)
+        {
+            var value = Environment.GetEnvironmentVariable(key);
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new InvalidOperationException(
+                    $"{key} is not configured. Set it in .env (local) or environment variables (production).");
+            }
+
+            return value;
         }
     }
 }
