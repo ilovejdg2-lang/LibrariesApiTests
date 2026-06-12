@@ -35,10 +35,21 @@ jobs:
           if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
           dotnet publish HackerRank1/HackerRank1.csproj `
             -c Release `
-            -o $publishDir `
-            --runtime win-x86 `
-            --self-contained false
+            -o $publishDir
+          New-Item -ItemType Directory -Path (Join-Path $publishDir "logs") -Force | Out-Null
           echo "PUBLISH_DIR=$publishDir" >> $env:GITHUB_ENV
+
+      - name: Create runtime .env for Monster ASP
+        shell: pwsh
+        env:
+          CONNECTION_STRING: ${{ secrets.CONNECTION_STRING }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
+          JWT_AUDIENCE: ${{ secrets.JWT_AUDIENCE }}
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
+        run: |
+          & ./HackerRank1/scripts/write-deploy-env.ps1 -PublishDir $env:PUBLISH_DIR
 
       - name: Deploy with MSDeploy
         shell: pwsh
