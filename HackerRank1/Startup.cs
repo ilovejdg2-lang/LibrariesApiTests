@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Npgsql;
 using System.Text;
 
 namespace LibraryService.WebAPI
@@ -74,8 +75,10 @@ namespace LibraryService.WebAPI
             services.AddTransient<ILibrariesService,  LibrariesService>();
             services.AddTransient<IBooksService,  BooksService>();
 
+            var connectionString = BuildConnectionString(Configuration);
+
             services.AddDbContextPool<LibraryContext>(options =>
-                options.UseNpgsql(Configuration.GetConnectionString("DefaultConnection"), npgsqlOptions =>
+                options.UseNpgsql(connectionString, npgsqlOptions =>
                 {
                     npgsqlOptions.EnableRetryOnFailure(
                         maxRetryCount: 1,
@@ -136,6 +139,28 @@ namespace LibraryService.WebAPI
             {
                 endpoints.MapControllers();
             });
+        }
+
+        private static string BuildConnectionString(IConfiguration configuration)
+        {
+            var baseConnectionString = configuration.GetConnectionString("DefaultConnection")
+                ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
+            var password = configuration["DB_PASSWORD"]
+                ?? Environment.GetEnvironmentVariable("DB_PASSWORD");
+
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                throw new InvalidOperationException(
+                    "Database password not configured. Set the DB_PASSWORD environment variable or add it to a local .env file.");
+            }
+
+            var builder = new NpgsqlConnectionStringBuilder(baseConnectionString)
+            {
+                Password = password
+            };
+
+            return builder.ConnectionString;
         }
     }
 }
