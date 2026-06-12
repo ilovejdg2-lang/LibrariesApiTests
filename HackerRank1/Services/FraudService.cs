@@ -19,8 +19,20 @@ namespace LibraryService.WebAPI.Services
                 .ToListAsync();
         }
 
+        public string? Validate(Fraud fraud)
+        {
+            if (string.IsNullOrWhiteSpace(fraud.ImpostorDetails))
+                return "ImpostorDetails es obligatorio.";
+
+            if (string.IsNullOrWhiteSpace(fraud.ContactInfo))
+                return "ContactInfo es obligatorio.";
+
+            return null;
+        }
+
         public async Task<Fraud> AddAsync(Fraud fraud)
         {
+            fraud.Comments ??= string.Empty;
             fraud.CreatedAt = DateTime.UtcNow;
 
             await _context.Frauds.AddAsync(fraud);
@@ -33,6 +45,7 @@ namespace LibraryService.WebAPI.Services
     public interface IFraudService
     {
         Task<IEnumerable<Fraud>> GetAllAsync();
+        string? Validate(Fraud fraud);
         Task<Fraud> AddAsync(Fraud fraud);
     }
 }
