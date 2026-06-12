@@ -112,17 +112,15 @@ namespace LibraryService.WebAPI
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            using (var scope = app.ApplicationServices.CreateScope())
+            try
             {
+                using var scope = app.ApplicationServices.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<LibraryContext>();
-                try
-                {
-                    db.Database.Migrate();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Database init failed: {ex.Message}");
-                }
+                db.Database.Migrate();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Database init failed: {ex.Message}");
             }
 
             if (env.IsDevelopment())
