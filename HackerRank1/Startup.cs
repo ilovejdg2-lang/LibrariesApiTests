@@ -155,10 +155,12 @@ namespace LibraryService.WebAPI
 
         private static string BuildConnectionString(IConfiguration configuration)
         {
-            var baseConnectionString = Environment.GetEnvironmentVariable("CONNECTION_STRING")
+            var baseConnectionString = (
+                Environment.GetEnvironmentVariable("CONNECTION_STRING")
                 ?? configuration.GetConnectionString("DefaultConnection")
                 ?? Environment.GetEnvironmentVariable("DATABASE_URL")
-                ?? Environment.GetEnvironmentVariable("SUPABASE_DB_URL");
+                ?? Environment.GetEnvironmentVariable("SUPABASE_DB_URL")
+            )?.Trim();
 
             if (string.IsNullOrWhiteSpace(baseConnectionString))
             {
@@ -166,21 +168,78 @@ namespace LibraryService.WebAPI
                     "Database host not configured. Set CONNECTION_STRING in .env or Monster ASP environment variables.");
             }
 
+            var builder = ParseConnectionString(baseConnectionString);
+
             var password = Environment.GetEnvironmentVariable("DB_PASSWORD")
                 ?? configuration["DB_PASSWORD"];
 
-            if (string.IsNullOrWhiteSpace(password))
+            if (!string.IsNullOrWhiteSpace(password))
+                builder.Password = password;
+
+            if (string.IsNullOrWhiteSpace(builder.Password))
             {
                 throw new InvalidOperationException(
                     "Database password not configured. Set DB_PASSWORD in .env or Monster ASP environment variables.");
             }
 
-            var builder = new NpgsqlConnectionStringBuilder(baseConnectionString)
+            return builder.ConnectionString;
+        }
+
+        private static NpgsqlConnectionStringBuilder ParseConnectionString(string connectionString)
+        {
+            if (connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
+                || connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
             {
-                Password = password
+                return FromPostgresUri(connectionString);
+            }
+
+            return new NpgsqlConnectionStringBuilder(connectionString);
+        }
+
+        private static NpgsqlConnectionStringBuilder FromPostgresUri(string databaseUrl)
+        {
+            var uri = new Uri(databaseUrl);
+            var builder = new NpgsqlConnectionStringBuilder
+            {
+                Host = uri.Host,
+                Port = uri.IsDefaultPort ? 5432 : uri.Port,
+                Database = string.IsNullOrEmpty(uri.AbsolutePath) || uri.AbsolutePath == "/"
+                    ? "postgres"
+                    : uri.AbsolutePath.TrimStart('/'),
+                SslMode = SslMode.Require,
+                TrustServerCertificate = true
             };
 
-            return builder.ConnectionString;
+            if (!string.IsNullOrEmpty(uri.UserInfo))
+            {
+                var parts = uri.UserInfo.Split(':', 2);
+                builder.Username = Uri.UnescapeDataString(parts[0]);
+                if (parts.Length > 1 && !string.IsNullOrEmpty(parts[1]))
+                    builder.Password = Uri.UnescapeDataString(parts[1]);
+            }
+
+            foreach (var segment in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var eq = segment.IndexOf('=');
+                if (eq <= 0)
+                    continue;
+
+                var key = Uri.UnescapeDataString(segment[..eq]);
+                var value = Uri.UnescapeDataString(segment[(eq + 1)..]);
+
+                switch (key.ToLowerInvariant())
+                {
+                    case "sslmode" when Enum.TryParse<SslMode>(value, true, out var sslMode):
+                        builder.SslMode = sslMode;
+                        break;
+                    case "trust server certificate":
+                    case "trustservercertificate":
+                        builder.TrustServerCertificate = value is "true" or "1" or "yes";
+                        break;
+                }
+            }
+
+            return builder;
         }
 
         private static string[] GetCorsOrigins()
