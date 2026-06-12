@@ -1,0 +1,61 @@
+name: Deploy to Monster ASP
+
+on:
+  push:
+    branches:
+      - examen/reporte-fraudes
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install Web Deploy
+        shell: pwsh
+        run: |
+          choco install webdeploy -y --no-progress
+          if (-not (Test-Path "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe")) {
+            throw "msdeploy.exe no se instalo correctamente"
+          }
+
+      - name: Publish API
+        shell: pwsh
+        run: |
+          $publishDir = Join-Path $env:RUNNER_TEMP "HackerRank1-publish"
+          if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
+          dotnet publish HackerRank1/HackerRank1.csproj `
+            -c Release `
+            -o $publishDir `
+            --runtime win-x86 `
+            --self-contained false
+          echo "PUBLISH_DIR=$publishDir" >> $env:GITHUB_ENV
+
+      - name: Deploy with MSDeploy
+        shell: pwsh
+        env:
+          WEBSITE_NAME: ${{ secrets.WEBSITE_NAME }}
+          SERVER_COMPUTER_NAME: ${{ secrets.SERVER_COMPUTER_NAME }}
+          SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
+          SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WEBSITE_NAME)) { throw "Falta el secret WEBSITE_NAME en GitHub" }
+          if ([string]::IsNullOrWhiteSpace($env:SERVER_COMPUTER_NAME)) { throw "Falta el secret SERVER_COMPUTER_NAME en GitHub" }
+          if ([string]::IsNullOrWhiteSpace($env:SERVER_USERNAME)) { throw "Falta el secret SERVER_USERNAME en GitHub" }
+          if ([string]::IsNullOrWhiteSpace($env:SERVER_PASSWORD)) { throw "Falta el secret SERVER_PASSWORD en GitHub" }
+
+          & ./HackerRank1/scripts/deploy-msdeploy.ps1 `
+            -PublishDir $env:PUBLISH_DIR `
+            -WebsiteName $env:WEBSITE_NAME `
+            -ServerComputerName $env:SERVER_COMPUTER_NAME `
+            -ServerUsername $env:SERVER_USERNAME `
+            -ServerPassword $env:SERVER_PASSWORD
