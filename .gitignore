@@ -1,10 +1,8 @@
-# Build outputs
 bin/
 obj/
 out/
 publish/
 
-# Visual Studio / IDE
 *.user
 *.suo
 *.sln.docstates
@@ -13,18 +11,16 @@ publish/
 *.DotSettings.user
 .vscode/
 
-# NuGet
 *.nupkg
 packages/
 
-# OS
 .DS_Store
 Thumbs.db
 
-# Logs
 *.log
+**/_local-monster-publish/
+**/monster-local-*.txt
 
-# Secretos — NUNCA subir
 HackerRank1/.env
 .env
 .env.*

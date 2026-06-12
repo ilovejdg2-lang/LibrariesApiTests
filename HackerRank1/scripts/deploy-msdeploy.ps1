@@ -42,8 +42,6 @@ if (-not $msdeploy) {
 }
 
 $destUrl = "https://${deployHost}:8172/msdeploy.axd?site=$siteName"
-Write-Host "MSDeploy: $siteName -> https://${deployHost}:8172"
-Write-Host "Origen: $publishPath"
 
 & $msdeploy -verb:sync `
     "-source:contentPath=$publishPath" `
@@ -58,5 +56,3 @@ Write-Host "Origen: $publishPath"
 if ($LASTEXITCODE -ne 0) {
     throw "msdeploy fallo con codigo $LASTEXITCODE"
 }
-
-Write-Host 'Deploy completado.'
