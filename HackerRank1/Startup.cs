@@ -74,6 +74,7 @@ namespace LibraryService.WebAPI
             // Add support for Dependency Injection for internal services (BooksService and LibrariesService)
             services.AddTransient<ILibrariesService,  LibrariesService>();
             services.AddTransient<IBooksService,  BooksService>();
+            services.AddTransient<IFraudService, FraudService>();
 
             var connectionString = BuildConnectionString(Configuration);
 
